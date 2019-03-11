@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+<head>
+    <link rel="stylesheet" href="style.css">
+
+    <title>Socket.IO chat</title>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font: 13px Helvetica, Arial; }
+        form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+        form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+        form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+        #messages { list-style-type: none; margin: 0; padding: 0; bottom: 0;}
+        #messages li { padding: 5px 10px; }
+        #messages li:nth-child(odd) { background: #eee; }
+        #messages { margin-bottom: 40px }
+        .column {
+            float: left;
+            padding: 10px;
+            height: 550px;
+        }
+
+        .left {
+            width: 75%;
+        }
+
+        .right {
+            width: 25%;
+        }
+        .row:after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+
+        #parent{
+            position:absolute;
+            /* these parts are obviously not necessary */
+            width: 74%;
+            margin-top: 30px;
+            top:10px;
+            bottom:10px;
+        }
+        #child{
+            position:absolute;
+            bottom:0px;
+            right:0px;
+            left:0px;
+            overflow-y:auto;
+            /* this is the key */
+            max-height:100%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="row">
+   <div class="column left" >
+       <div style="background-color: coral; height: 30px"> <h2 id="identitytext">You Are:</h2>
+       </div>
+       <div id="parent">
+           <div id="child">
+
+           <ul id="messages"></ul>
+           </div>
+       </div>
+        <form action="">
+            <input id="m" autocomplete="off" /><button>Send</button>
+        </form>
+    </div>
+    <div class="column right" style="background-color:coral;">
+
+        <h2>Online users</h2>
+
+        <div class="parent">
+            <div class="absolute">
+        <p id ='users'> </p>
+                <p> <br>  </p>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+<script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+<script>
+
+    $(function () {
+        var socket = io();
+        if (!document.cookie) {
+            socket.emit('getUser');
+        } else {
+
+        var cookiename = document.cookie.split(';').find(function (element) {
+            return element.includes("name=");
+        });
+        cookiename = cookiename.split("=")[1];
+        socket.emit('getUser', cookiename);
+    };
+
+        socket.on('printdefault', function(data){
+            var identitiytext = $('#identitytext').text();
+            console.error(identitiytext)
+            if (identitiytext == "You Are:") identitiytext = false;
+            if(!identitiytext){
+                $('#identitytext').text("You are: "  +data);
+
+            }
+        });
+        socket.on('getmessages', function(data){
+            var html =" ";
+            let messageContent = $('#messages').text()
+            if(!messageContent){
+                for(i=0; i<data.length; i++){
+                    text = $.parseHTML('<li>' +  data[i].hour + ":" + data[i].minutes +  " " + '<b>' + data[i].msg +'</b>' + " " +data[i].nickname + '</li>');
+                    html += $('#messages').append(text);
+                }
+            }
+        });
+
+        socket.on('usernames', function(data, nickname){
+            var html =" ";
+            for(i=0; i<data.length; i++){
+                html += data[i] + `<br/>`;
+            }
+            html = $.parseHTML( html);
+            $('#users').html(html);
+
+        });
+
+        $('form').submit(function(){
+            socket.emit('chat message', $('#m').val());
+            $('#m').val('');
+            return false;
+        });
+        socket.on('chat message', function(hour,minutes, msg, nickname){
+            if(msg.includes("/nick ") ){
+                let newNickname = msg.split(" ")[1];
+                document.cookie = "name=" + newNickname;
+                socket.emit('new user', newNickname, function(data){
+                    if(!data){
+                        console.error("this nickname has been used");
+                    }
+                    else{
+                        $('#identitytext').text("You are: " +newNickname);
+                        console.error("A NEW COOKIE HAS BEEN SET" + newNickname +  document.cookie)
+                    }
+                })
+            }
+            if(msg.includes("/nickcolor")){
+                let colour = msg.split(" ")[1];
+                console.error("THIS IS OUR NEW COLOUR " + colour)
+                socket.emit('change colour', colour);
+            }
+            html = $.parseHTML( '<li>' +hour + ":"+  minutes+  " " +nickname + " " + '<b>' +  msg +'</b>' + '</li>');
+
+            $('#messages').append(html);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+    });
+</script>
+</body>
+</html>
